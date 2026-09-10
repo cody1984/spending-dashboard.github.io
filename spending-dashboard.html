@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1e293b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Spending">
+<title>Annual Spending Dashboard</title>
+<style>
+  :root {
+    --bg: #f4f6f8;
+    --card: #ffffff;
+    --ink: #1e293b;
+    --muted: #64748b;
+    --accent: #2563eb;
+    --accent-soft: #dbeafe;
+    --good: #16a34a;
+    --bad: #dc2626;
+    --border: #e2e8f0;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    -webkit-text-size-adjust: 100%;
+    touch-action: manipulation;
+  }
+  a { color: var(--accent); }
+  header {
+    background: var(--ink);
+    color: #fff;
+    padding: 18px 28px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding-top: calc(18px + env(safe-area-inset-top));
+  }
+  header h1 { margin: 0; font-size: 1.25rem; font-weight: 600; }
+  header .tools { display: flex; gap: 8px; flex-wrap: wrap; }
+  main { max-width: 1100px; margin: 0 auto; padding: 20px; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-bottom: 18px;
+  }
+  .card h2 { margin: 0 0 14px; font-size: 1rem; font-weight: 600; }
+
+  .grid { display: grid; gap: 16px; }
+  .grid.income { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+  .grid.summary { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+
+  label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 4px; font-weight: 600; }
+  input, select {
+    width: 100%;
+    padding: 9px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    /* 16px prevents iOS Safari auto-zoom on focus */
+    font-size: 16px;
+    font-family: inherit;
+    background: #fff;
+    color: var(--ink);
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  select {
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2364748b' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 30px;
+  }
+  input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+  input[readonly] { background: #f8fafc; color: var(--muted); }
+
+  .form-row { display: grid; grid-template-columns: 2.5fr 1.2fr 1.2fr 1.4fr auto; gap: 10px; align-items: end; }
+  .cloud-row { display: grid; grid-template-columns: 1.5fr 1.5fr auto; gap: 10px; align-items: end; }
+  @media (max-width: 800px) {
+    .form-row { grid-template-columns: 1fr 1fr; }
+    .form-row > div:first-child { grid-column: 1 / -1; }
+    .cloud-row { grid-template-columns: 1fr; }
+  }
+
+  button {
+    padding: 10px 14px;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--accent);
+    color: #fff;
+    font-family: inherit;
+  }
+  button:hover { filter: brightness(0.93); }
+  button.ghost { background: #fff; color: var(--ink); border: 1px solid var(--border); }
+  button.danger { background: #fff; color: var(--bad); border: 1px solid var(--border); padding: 6px 12px; font-size: 0.8rem; }
+  button.link { background: none; color: var(--accent); padding: 6px 10px; font-size: 0.85rem; }
+  button.link:hover { filter: none; text-decoration: underline; }
+
+  .stat { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .stat .label { font-size: 0.75rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+  .stat .value { font-size: 1.45rem; font-weight: 700; margin-top: 4px; }
+  .stat .sub { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+  .value.pos { color: var(--good); }
+  .value.neg { color: var(--bad); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  th {
+    text-align: left; padding: 8px 10px; border-bottom: 2px solid var(--border);
+    font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em;
+    white-space: nowrap;
+  }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  td.num, th.num { text-align: right; white-space: nowrap; }
+  tr:hover td { background: #f8fafc; }
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .empty { color: var(--muted); font-size: 0.9rem; padding: 12px 0; }
+
+  .bar-row { margin-bottom: 12px; }
+  .bar-row .bar-top { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 4px; gap: 6px 10px; flex-wrap: wrap; }
+  .bar-row .bar-top strong { font-weight: 600; }
+  .bar-track { background: #eef2f7; border-radius: 5px; height: 14px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 5px; }
+
+  .filters { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+  .filters > div { flex: 1; min-width: 160px; }
+
+  .hint { font-size: 0.78rem; color: var(--muted); margin-top: 10px; }
+  .syncbar {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    background: var(--accent-soft); border: 1px solid #bfdbfe;
+    border-radius: 8px; padding: 8px 14px; margin-bottom: 18px;
+    font-size: 0.85rem;
+  }
+  .syncbar .status { flex: 1; min-width: 200px; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+  .dot.on { background: var(--good); }
+  .dot.off { background: var(--bad); }
+  .dot.warn { background: #d97706; }
+  footer {
+    text-align: center; color: var(--muted); font-size: 0.78rem;
+    padding: 10px 20px calc(30px + env(safe-area-inset-bottom)) 20px;
+  }
+
+  /* ---------- phone layout ---------- */
+  @media (max-width: 700px) {
+    header { padding: 14px 16px; padding-top: calc(14px + env(safe-area-inset-top)); }
+    header h1 { font-size: 1.05rem; }
+    header .tools { width: 100%; }
+    header .tools button { flex: 1 1 auto; min-width: 86px; padding: 10px 6px; }
+    main { padding: 14px; }
+    .card { padding: 14px; border-radius: 10px; }
+    .grid.summary { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .stat { padding: 12px 14px; }
+    .stat .value { font-size: 1.15rem; }
+    .syncbar { font-size: 0.8rem; padding: 10px 12px; }
+    .hint { font-size: 0.75rem; }
+    .filters > div { min-width: 100%; }
+    button { min-height: 44px; }
+    button.danger, button.link { min-height: 40px; }
+    .form-row button, .cloud-row button { width: 100%; }
+  }
+
+  /* expense table becomes stacked cards on phones */
+  @media (max-width: 640px) {
+    .table-wrap { overflow-x: visible; }
+    table, tbody, tr, td { display: block; width: 100%; }
+    thead { display: none; }
+    tr {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 2px 14px 8px;
+      margin-bottom: 12px;
+      background: #fff;
+    }
+    tr:hover td { background: transparent; }
+    td {
+      border-bottom: none;
+      padding: 7px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      text-align: right;
+    }
+    td::before {
+      content: attr(data-label);
+      font-size: 0.7rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      font-weight: 600;
+      text-align: left;
+    }
+    td.desc { font-weight: 600; font-size: 1rem; padding-top: 10px; text-align: left; }
+    td.desc::before { display: none; }
+    td.actions { justify-content: flex-end; padding-top: 2px; }
+    td.actions::before { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Annual Spending Dashboard</h1>
+  <div class="tools">
+    <button class="ghost" id="btnLinkFile">Link save file</button>
+    <button class="ghost" id="btnExportCsv">Export CSV</button>
+    <button class="ghost" id="btnExportJson">Export JSON</button>
+    <button class="ghost" id="btnImport">Import JSON</button>
+    <button class="ghost" id="btnClear">Clear All</button>
+    <input type="file" id="fileImport" accept=".json" style="display:none">
+  </div>
+</header>
+
+<main>
+
+  <div class="syncbar" id="syncBar">
+    <span class="status" id="syncStatus"></span>
+    <button class="ghost" id="btnReconnect" style="display:none">Reconnect file</button>
+    <button class="link" id="btnUnlink" style="display:none">Unlink</button>
+  </div>
+
+  <div class="card">
+    <h2>Income</h2>
+    <div class="grid income">
+      <div>
+        <label for="earnings">Take-home earnings per period</label>
+        <input type="number" inputmode="decimal" id="earnings" min="0" step="0.01" placeholder="e.g. 2400">
+      </div>
+      <div>
+        <label for="incomeFreq">Pay frequency</label>
+        <select id="incomeFreq">
+          <option value="fortnightly" selected>Fortnightly (26/yr)</option>
+          <option value="weekly">Weekly (52/yr)</option>
+          <option value="monthly">Monthly (12/yr)</option>
+          <option value="annually">Annually (1/yr)</option>
+        </select>
+      </div>
+      <div>
+        <label>Annual income</label>
+        <input type="text" id="annualIncome" readonly>
+      </div>
+      <div>
+        <label>Fortnightly equivalent</label>
+        <input type="text" id="fortnightlyIncome" readonly>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 id="formTitle">Add an expense</h2>
+    <form id="expenseForm" class="form-row" autocomplete="off">
+      <div>
+        <label for="desc">Description</label>
+        <input type="text" id="desc" required placeholder="e.g. Rent, Health insurance, Rego">
+      </div>
+      <div>
+        <label for="amount">Amount ($)</label>
+        <input type="number" inputmode="decimal" id="amount" min="0" step="0.01" required placeholder="e.g. 89.90">
+      </div>
+      <div>
+        <label for="freq">Frequency</label>
+        <select id="freq">
+          <option value="weekly">Weekly</option>
+          <option value="fortnightly" selected>Fortnightly</option>
+          <option value="monthly">Monthly</option>
+          <option value="quarterly">Quarterly</option>
+          <option value="annually">Annually</option>
+          <option value="once">One-off (this year)</option>
+        </select>
+      </div>
+      <div>
+        <label for="category">Category</label>
+        <input type="text" id="category" list="categoryList" placeholder="e.g. Housing">
+        <datalist id="categoryList">
+          <option value="Housing">
+          <option value="Utilities">
+          <option value="Groceries">
+          <option value="Transport">
+          <option value="Insurance">
+          <option value="Health">
+          <option value="Subscriptions">
+          <option value="Entertainment">
+          <option value="Debt / Loans">
+          <option value="Savings / Investing">
+          <option value="Other">
+        </datalist>
+      </div>
+      <div>
+        <button type="submit" id="submitBtn">Add</button>
+        <button type="button" class="ghost" id="cancelEdit" style="display:none">Cancel</button>
+      </div>
+    </form>
+    <p class="hint">One-off costs (rego, holidays, gifts) can be entered with the "One-off" frequency — they still count toward your annual total.</p>
+  </div>
+
+  <div class="grid summary" id="summaryCards"></div>
+
+  <div class="card">
+    <h2>Where the money goes (annualised)</h2>
+    <div id="breakdown"></div>
+  </div>
+
+  <div class="card">
+    <h2>Expenses</h2>
+    <div class="filters">
+      <div>
+        <label for="search">Search</label>
+        <input type="text" id="search" placeholder="Filter by description...">
+      </div>
+      <div>
+        <label for="catFilter">Category</label>
+        <select id="catFilter"><option value="">All categories</option></select>
+      </div>
+      <div>
+        <label for="sortBy">Sort by</label>
+        <select id="sortBy">
+          <option value="added">Order added</option>
+          <option value="annual-desc">Annual cost (high → low)</option>
+          <option value="annual-asc">Annual cost (low → high)</option>
+          <option value="desc">Description (A → Z)</option>
+          <option value="category">Category (A → Z)</option>
+        </select>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th>Category</th>
+            <th class="num">Amount</th>
+            <th>Frequency</th>
+            <th class="num">Per fortnight</th>
+            <th class="num">Per year</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="expenseBody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="emptyMsg" style="display:none">No expenses yet — add them above as you think of them. Everything saves automatically in this browser.</div>
+  </div>
+
+  <div class="card" id="cloudCard">
+    <h2>Cloud sync across devices (optional)</h2>
+    <p class="hint" style="margin-top:0">
+      Keep the same inputs on every device using a <strong>secret GitHub Gist</strong> — a private JSON file
+      that only you can access. Create a token at
+      <a href="https://github.com/settings/tokens/new?scopes=gist&description=Spending%20dashboard%20sync" target="_blank" rel="noopener">github.com/settings/tokens</a>
+      with only the <strong>gist</strong> scope enabled (use a classic token — fine-grained tokens don't support Gists),
+      paste it below, and connect. Data is pulled when the page opens and pushed a couple of seconds after any change.
+    </p>
+    <div class="cloud-row">
+      <div>
+        <label for="gistTokenInput">GitHub token (gist scope)</label>
+        <input type="password" id="gistTokenInput" autocomplete="off" placeholder="ghp_…">
+      </div>
+      <div>
+        <label for="gistIdInput">Gist ID (leave blank on first connect)</label>
+        <input type="text" id="gistIdInput" placeholder="optional — filled in after first connect">
+      </div>
+      <div>
+        <button type="button" id="btnCloudConnect">Connect</button>
+      </div>
+    </div>
+    <div class="hint" id="cloudStatus">Not connected — data stays on this device only.</div>
+    <button class="link" id="btnCloudSync" style="display:none">Sync now</button>
+    <button class="link" id="btnCloudDisconnect" style="display:none">Disconnect</button>
+  </div>
+
+</main>
+<footer>Saved automatically to this browser (localStorage)<span id="footerFile"></span>. Use Export JSON for portable backups.</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  const STORAGE_KEY = "spendDash.v1";
+  const FORTNIGHTS_PER_YEAR = 26;
+  const FS_API_SUPPORTED = "showSaveFilePicker" in window;
+  const GIST_FILENAME = "spending-dashboard-data.json";
+
+  const FREQ = {
+    weekly:      { label: "Weekly",      perYear: 52 },
+    fortnightly: { label: "Fortnightly", perYear: 26 },
+    monthly:     { label: "Monthly",     perYear: 12 },
+    quarterly:   { label: "Quarterly",   perYear: 4 },
+    annually:    { label: "Annually",    perYear: 1 },
+    once:        { label: "One-off",     perYear: 1 }
+  };
+
+  const CAT_COLORS = [
+    "#2563eb", "#16a34a", "#d97706", "#dc2626", "#7c3aed",
+    "#0891b2", "#db2777", "#65a30d", "#ea580c", "#4f46e5", "#64748b"
+  ];
+
+  const AUD = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" });
+  const fmt = n => AUD.format(Math.round(n * 100) / 100);
+  const fmtPct = n => (n * 100).toFixed(1) + "%";
+
+  let state = { earnings: null, incomeFreq: "fortnightly", expenses: [], updatedAt: 0 };
+  let editingId = null;
+  let nextId = 1;
+
+  function renumber() {
+    const maxId = state.expenses.reduce((m, x) => Math.max(m, x.id || 0), 0);
+    nextId = maxId + 1;
+  }
+
+  // ==================== persistence layer ====================
+  // Layer 1: localStorage — always on, survives browser restarts.
+  // Layer 2 (optional): linked JSON file via File System Access API (desktop Chromium).
+  // Layer 3 (optional): secret GitHub Gist — cross-device sync.
+
+  function save(pushCloud) {
+    state.updatedAt = Date.now();
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+    scheduleFileWrite();
+    if (pushCloud !== false) scheduleGistPush();
+  }
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.expenses)) state = parsed;
+      }
+    } catch (e) {}
+    if (!state.updatedAt) state.updatedAt = 0;
+    renumber();
+  }
+
+  // ---------- linked-file sync (desktop Chromium only; hidden elsewhere) ----------
+  let linkedHandle = null;
+  let fileWriteTimer = null;
+  let fileSyncActive = false;
+
+  function idbOpen() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open("spendDashFS", 1);
+      req.onupgradeneeded = () => { req.result.createObjectStore("handles"); };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  function idbPut(key, val) {
+    return idbOpen().then(db => new Promise((res, rej) => {
+      const tx = db.transaction("handles", "readwrite");
+      tx.objectStore("handles").put(val, key);
+      tx.oncomplete = () => res();
+      tx.onerror = () => rej(tx.error);
+    }));
+  }
+  function idbGet(key) {
+    return idbOpen().then(db => new Promise((res, rej) => {
+      const tx = db.transaction("handles", "readonly");
+      const rq = tx.objectStore("handles").get(key);
+      rq.onsuccess = () => res(rq.result);
+      rq.onerror = () => rej(rq.error);
+    }));
+  }
+  function idbDel(key) {
+    return idbOpen().then(db => new Promise((res, rej) => {
+      const tx = db.transaction("handles", "readwrite");
+      tx.objectStore("handles").delete(key);
+      tx.oncomplete = () => res();
+      tx.onerror = () => rej(tx.error);
+    }));
+  }
+
+  function setSyncStatus(kind, text) {
+    const el = document.getElementById("syncStatus");
+    el.innerHTML = '<span class="dot ' + kind + '"></span>' + text;
+  }
+
+  function renderSyncBar() {
+    const btnLink = document.getElementById("btnLinkFile");
+    const btnRec = document.getElementById("btnReconnect");
+    const btnUnlink = document.getElementById("btnUnlink");
+    const footerFile = document.getElementById("footerFile");
+
+    if (!FS_API_SUPPORTED) {
+      document.getElementById("syncBar").style.display = "none";
+      btnLink.style.display = "none";
+      footerFile.textContent = "";
+      return;
+    }
+
+    if (linkedHandle && fileSyncActive) {
+      setSyncStatus("on", "Auto-saving to <strong>" + escapeHtml(linkedHandle.name) + "</strong> on every change, plus this browser's storage.");
+      btnLink.style.display = "none";
+      btnRec.style.display = "none";
+      btnUnlink.style.display = "";
+      footerFile.textContent = " and to " + linkedHandle.name;
+    } else if (linkedHandle) {
+      setSyncStatus("warn", "Linked file <strong>" + escapeHtml(linkedHandle.name) + "</strong> needs reconnection after this session restart — click to resume auto-save.");
+      btnLink.style.display = "none";
+      btnRec.style.display = "";
+      btnUnlink.style.display = "";
+      footerFile.textContent = "";
+    } else {
+      setSyncStatus("off", "Saved in this browser only. Link a save file to keep a live backup that survives cleared browser data.");
+      btnLink.style.display = "";
+      btnRec.style.display = "none";
+      btnUnlink.style.display = "none";
+      footerFile.textContent = "";
+    }
+  }
+
+  async function hasWritePermission(handle) {
+    try {
+      if ((await handle.queryPermission({ mode: "readwrite" })) === "granted") return true;
+    } catch (e) {}
+    return false;
+  }
+
+  async function requestWritePermission(handle) {
+    try {
+      if ((await handle.queryPermission({ mode: "readwrite" })) === "granted") return true;
+      if ((await handle.requestPermission({ mode: "readwrite" })) === "granted") return true;
+    } catch (e) {}
+    return false;
+  }
+
+  function scheduleFileWrite() {
+    if (!linkedHandle) return;
+    clearTimeout(fileWriteTimer);
+    fileWriteTimer = setTimeout(writeStateToFile, 400);
+  }
+
+  async function writeStateToFile() {
+    if (!linkedHandle || !fileSyncActive) return;
+    try {
+      const w = await linkedHandle.createWritable();
+      await w.write(JSON.stringify(state, null, 2));
+      await w.close();
+    } catch (e) {
+      fileSyncActive = false;
+      renderSyncBar();
+    }
+  }
+
+  document.getElementById("btnLinkFile").addEventListener("click", async () => {
+    if (!FS_API_SUPPORTED) return;
+    try {
+      linkedHandle = await window.showSaveFilePicker({
+        suggestedName: "spending-dashboard-data.json",
+        types: [{ description: "JSON data", accept: { "application/json": [".json"] } }]
+      });
+      fileSyncActive = true;
+      await idbPut("fileHandle", linkedHandle);
+      await writeStateToFile();
+      renderSyncBar();
+    } catch (e) { /* user cancelled */ }
+  });
+
+  document.getElementById("btnReconnect").addEventListener("click", async () => {
+    if (!linkedHandle) return;
+    const ok = await requestWritePermission(linkedHandle);
+    if (ok) {
+      fileSyncActive = true;
+      await writeStateToFile();
+    }
+    renderSyncBar();
+  });
+
+  document.getElementById("btnUnlink").addEventListener("click", async () => {
+    linkedHandle = null;
+    fileSyncActive = false;
+    await idbDel("fileHandle");
+    renderSyncBar();
+  });
+
+  async function initLinkedFile() {
+    if (!FS_API_SUPPORTED) { renderSyncBar(); return; }
+    try {
+      const handle = await idbGet("fileHandle");
+      if (handle) {
+        linkedHandle = handle;
+        if (await hasWritePermission(handle)) {
+          fileSyncActive = true;
+        }
+      }
+    } catch (e) {}
+    renderSyncBar();
+    if (fileSyncActive) writeStateToFile();
+  }
+
+  // ---------- cloud sync via secret GitHub Gist ----------
+  let gistId = null;
+  let gistToken = null;
+  let gistPushTimer = null;
+  let lastPushOk = null;
+  let lastPullOk = null;
+
+  function cloudConnected() { return !!(gistId && gistToken); }
+
+  function ghFetch(path, opts) {
+    opts = opts || {};
+    return fetch("https://api.github.com" + path, {
+      method: opts.method || "GET",
+      headers: {
+        "Accept": "application/vnd.github+json",
+        "Authorization": "Bearer " + gistToken,
+        "X-GitHub-Api-Version": "2022-11-28",
+        ...(opts.headers || {})
+      },
+      ...(opts.body ? { body: opts.body } : {})
+    }).then(res => {
+      if (!res.ok) {
+        const err = new Error("GitHub API " + res.status);
+        err.status = res.status;
+        throw err;
+      }
+      return res.json();
+    });
+  }
+
+  function renderCloudStatus(kind, detail) {
+    const el = document.getElementById("cloudStatus");
+    const btnSync = document.getElementById("btnCloudSync");
+    const btnDisc = document.getElementById("btnCloudDisconnect");
+    if (!cloudConnected()) {
+      el.textContent = "Not connected — data stays on this device only.";
+      btnSync.style.display = "none";
+      btnDisc.style.display = "none";
+      return;
+    }
+    btnSync.style.display = "";
+    btnDisc.style.display = "";
+    if (kind === "ok") {
+      el.innerHTML = "Connected to Gist <code>" + escapeHtml(String(gistId).slice(0, 8)) + "…</code>. " +
+        (lastPushOk ? "Last pushed " + new Date(lastPushOk).toLocaleTimeString() + ". " : "") +
+        (lastPullOk ? "Last checked " + new Date(lastPullOk).toLocaleTimeString() + ". " : "") +
+        "Pulls on open, pushes after every change.";
+    } else if (kind === "error") {
+      el.innerHTML = '<span style="color:var(--bad)">Sync problem: ' + escapeHtml(detail || "unknown error") +
+        '. Your data is still saved locally — check the token and Gist ID, then Sync now.</span>';
+    }
+  }
+
+  function scheduleGistPush() {
+    if (!cloudConnected()) return;
+    clearTimeout(gistPushTimer);
+    gistPushTimer = setTimeout(pushGist, 2000);
+  }
+
+  async function pushGist() {
+    if (!cloudConnected()) return;
+    try {
+      await ghFetch("/gists/" + gistId, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ files: { [GIST_FILENAME]: { content: JSON.stringify(state, null, 2) } } })
+      });
+      lastPushOk = Date.now();
+      renderCloudStatus("ok");
+    } catch (e) {
+      renderCloudStatus("error", e.message);
+    }
+  }
+
+  async function pullGist() {
+    if (!cloudConnected()) return;
+    try {
+      const g = await ghFetch("/gists/" + gistId);
+      lastPullOk = Date.now();
+      const file = g.files && g.files[GIST_FILENAME];
+      if (!file || !file.content) { renderCloudStatus("ok"); return; }
+      const cloud = JSON.parse(file.content);
+      if (!cloud || !Array.isArray(cloud.expenses)) { renderCloudStatus("ok"); return; }
+      const localT = state.updatedAt || 0;
+      const cloudT = cloud.updatedAt || 0;
+      if (cloudT > localT) {
+        state = cloud;
+        if (!state.updatedAt) state.updatedAt = cloudT;
+        renumber();
+        save(false); // persist locally, don't re-push
+        renderAll();
+      } else if (localT > cloudT) {
+        await pushGist();
+        return;
+      }
+      renderCloudStatus("ok");
+    } catch (e) {
+      renderCloudStatus("error", e.message);
+    }
+  }
+
+  document.getElementById("btnCloudConnect").addEventListener("click", async () => {
+    const token = document.getElementById("gistTokenInput").value.trim();
+    let id = document.getElementById("gistIdInput").value.trim();
+    if (id) id = id.split("/").pop(); // accept full gist URLs too
+    if (!token) { renderCloudStatus("error", "paste a token first"); return; }
+    if (token.startsWith("github_pat_")) {
+      renderCloudStatus("error", "fine-grained tokens don't support Gists — create a classic token with only the gist scope");
+      return;
+    }
+    gistToken = token;
+    try {
+      if (id) {
+        gistId = id;
+      } else {
+        const g = await ghFetch("/gists", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            description: "Spending dashboard data (auto-sync)",
+            public: false,
+            files: { [GIST_FILENAME]: { content: JSON.stringify(state, null, 2) } }
+          })
+        });
+        gistId = g.id;
+        lastPushOk = Date.now();
+      }
+      localStorage.setItem("spendDash.gistId", gistId);
+      localStorage.setItem("spendDash.gistToken", gistToken);
+      document.getElementById("gistIdInput").value = gistId;
+      document.getElementById("gistTokenInput").value = "";
+      await pullGist();
+    } catch (e) {
+      gistId = null;
+      gistToken = null;
+      renderCloudStatus("error", e.status === 401 ? "token rejected (check it has the gist scope)" : e.message);
+    }
+  });
+
+  document.getElementById("btnCloudSync").addEventListener("click", pullGist);
+
+  document.getElementById("btnCloudDisconnect").addEventListener("click", () => {
+    gistId = null;
+    gistToken = null;
+    localStorage.removeItem("spendDash.gistId");
+    localStorage.removeItem("spendDash.gistToken");
+    renderCloudStatus();
+  });
+
+  async function initCloud() {
+    gistId = localStorage.getItem("spendDash.gistId");
+    gistToken = localStorage.getItem("spendDash.gistToken");
+    if (cloudConnected()) {
+      document.getElementById("gistIdInput").value = gistId;
+      renderCloudStatus("ok");
+      await pullGist();
+    } else {
+      renderCloudStatus();
+    }
+  }
+
+  // Pull fresh data when the app comes back to the foreground (e.g. switching to it on a phone)
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && cloudConnected()) pullGist();
+  });
+
+  // ==================== calculations ====================
+  function annualIncome() {
+    const e = parseFloat(state.earnings);
+    if (!isFinite(e) || e <= 0) return 0;
+    return e * FREQ[state.incomeFreq].perYear;
+  }
+  function annualCost(exp) {
+    return exp.amount * FREQ[exp.freq].perYear;
+  }
+  function totalAnnualExpenses() {
+    return state.expenses.reduce((s, e) => s + annualCost(e), 0);
+  }
+  function categories() {
+    const map = new Map();
+    state.expenses.forEach(e => {
+      const cat = e.category || "Uncategorised";
+      map.set(cat, (map.get(cat) || 0) + annualCost(e));
+    });
+    return [...map.entries()].sort((a, b) => b[1] - a[1]);
+  }
+
+  // ==================== rendering ====================
+  const $ = id => document.getElementById(id);
+
+  function renderIncome() {
+    $("earnings").value = state.earnings != null ? state.earnings : "";
+    $("incomeFreq").value = state.incomeFreq;
+    const ai = annualIncome();
+    $("annualIncome").value = ai ? fmt(ai) : "—";
+    $("fortnightlyIncome").value = ai ? fmt(ai / FORTNIGHTS_PER_YEAR) : "—";
+  }
+
+  function renderSummary() {
+    const inc = annualIncome();
+    const exp = totalAnnualExpenses();
+    const surplus = inc - exp;
+    const savingsRate = inc > 0 ? surplus / inc : 0;
+
+    const cards = [
+      { label: "Fortnightly income", value: inc ? fmt(inc / FORTNIGHTS_PER_YEAR) : "—", sub: "" },
+      { label: "Fortnightly spending", value: exp ? fmt(exp / FORTNIGHTS_PER_YEAR) : fmt(0), sub: "" },
+      {
+        label: "Left per fortnight",
+        value: inc || exp ? fmt(surplus / FORTNIGHTS_PER_YEAR) : "—",
+        cls: surplus >= 0 ? "pos" : "neg",
+        sub: inc ? "after all listed expenses" : ""
+      },
+      { label: "Annual income", value: inc ? fmt(inc) : "—", sub: "" },
+      { label: "Annual spending", value: fmt(exp), sub: state.expenses.length + " expense" + (state.expenses.length === 1 ? "" : "s") },
+      {
+        label: "Annual surplus",
+        value: inc || exp ? fmt(surplus) : "—",
+        cls: surplus >= 0 ? "pos" : "neg",
+        sub: inc ? "savings rate " + fmtPct(savingsRate) : ""
+      }
+    ];
+
+    $("summaryCards").innerHTML = cards.map(c =>
+      '<div class="stat">' +
+        '<div class="label">' + c.label + '</div>' +
+        '<div class="value ' + (c.cls || "") + '">' + c.value + '</div>' +
+        (c.sub ? '<div class="sub">' + c.sub + '</div>' : "") +
+      '</div>'
+    ).join("");
+  }
+
+  function renderBreakdown() {
+    const inc = annualIncome();
+    const cats = categories();
+    if (!cats.length) {
+      $("breakdown").innerHTML = '<div class="empty">Nothing to show yet — add some expenses first.</div>';
+      return;
+    }
+    $("breakdown").innerHTML = cats.map(([cat, amt], i) => {
+      const pct = inc > 0 ? amt / inc : 0;
+      const width = inc > 0 ? Math.min(100, pct * 100) : 100;
+      const color = CAT_COLORS[i % CAT_COLORS.length];
+      return '<div class="bar-row">' +
+        '<div class="bar-top">' +
+          '<strong>' + escapeHtml(cat) + '</strong>' +
+          '<span>' + fmt(amt) + ' / yr &nbsp;·&nbsp; ' + fmt(amt / FORTNIGHTS_PER_YEAR) + ' / fortnight' +
+          (inc > 0 ? ' &nbsp;·&nbsp; ' + fmtPct(pct) + ' of income' : '') + '</span>' +
+        '</div>' +
+        '<div class="bar-track"><div class="bar-fill" style="width:' + width + '%; background:' + color + '"></div></div>' +
+      '</div>';
+    }).join("");
+  }
+
+  function currentRows() {
+    const q = $("search").value.trim().toLowerCase();
+    const cat = $("catFilter").value;
+    let rows = state.expenses.filter(e =>
+      (!q || e.desc.toLowerCase().includes(q)) &&
+      (!cat || (e.category || "Uncategorised") === cat)
+    );
+    const sort = $("sortBy").value;
+    if (sort === "annual-desc") rows.sort((a, b) => annualCost(b) - annualCost(a));
+    else if (sort === "annual-asc") rows.sort((a, b) => annualCost(a) - annualCost(b));
+    else if (sort === "desc") rows.sort((a, b) => a.desc.localeCompare(b.desc));
+    else if (sort === "category") rows.sort((a, b) => (a.category || "").localeCompare(b.category || ""));
+    return rows;
+  }
+
+  function renderTable() {
+    const body = $("expenseBody");
+    const rows = currentRows();
+    $("emptyMsg").style.display = state.expenses.length === 0 ? "" : "none";
+
+    body.innerHTML = rows.map(e =>
+      '<tr>' +
+        '<td class="desc">' + escapeHtml(e.desc) + '</td>' +
+        '<td data-label="Category">' + escapeHtml(e.category || "—") + '</td>' +
+        '<td class="num" data-label="Amount">' + fmt(e.amount) + '</td>' +
+        '<td data-label="Frequency">' + FREQ[e.freq].label + '</td>' +
+        '<td class="num" data-label="Per fortnight">' + fmt(annualCost(e) / FORTNIGHTS_PER_YEAR) + '</td>' +
+        '<td class="num" data-label="Per year"><strong>' + fmt(annualCost(e)) + '</strong></td>' +
+        '<td class="actions">' +
+          '<button class="link" data-edit="' + e.id + '">Edit</button> ' +
+          '<button class="danger" data-del="' + e.id + '">Delete</button>' +
+        '</td>' +
+      '</tr>'
+    ).join("");
+  }
+
+  function renderCatFilter() {
+    const cats = [...new Set(state.expenses.map(e => e.category || "Uncategorised"))].sort();
+    const sel = $("catFilter");
+    const current = sel.value;
+    sel.innerHTML = '<option value="">All categories</option>' +
+      cats.map(c => '<option value="' + escapeHtml(c) + '">' + escapeHtml(c) + '</option>').join("");
+    sel.value = cats.includes(current) ? current : "";
+  }
+
+  function renderAll() {
+    renderIncome();
+    renderSummary();
+    renderBreakdown();
+    renderCatFilter();
+    renderTable();
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  // ==================== events ====================
+  $("earnings").addEventListener("input", e => {
+    const v = parseFloat(e.target.value);
+    state.earnings = isFinite(v) && v >= 0 ? v : null;
+    save(); renderIncome(); renderSummary(); renderBreakdown();
+  });
+
+  $("incomeFreq").addEventListener("change", e => {
+    state.incomeFreq = e.target.value;
+    save(); renderIncome(); renderSummary(); renderBreakdown();
+  });
+
+  $("expenseForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const desc = $("desc").value.trim();
+    const amount = parseFloat($("amount").value);
+    const freq = $("freq").value;
+    const category = $("category").value.trim();
+    if (!desc || !isFinite(amount) || amount <= 0) return;
+
+    if (editingId != null) {
+      const exp = state.expenses.find(x => x.id === editingId);
+      if (exp) { exp.desc = desc; exp.amount = amount; exp.freq = freq; exp.category = category; }
+      stopEditing();
+    } else {
+      state.expenses.push({ id: nextId++, desc, amount, freq, category });
+    }
+    save(); renderAll();
+    $("expenseForm").reset();
+    $("freq").value = "fortnightly";
+    $("desc").focus();
+  });
+
+  $("cancelEdit").addEventListener("click", stopEditing);
+
+  function startEdit(id) {
+    const exp = state.expenses.find(x => x.id === id);
+    if (!exp) return;
+    editingId = id;
+    $("desc").value = exp.desc;
+    $("amount").value = exp.amount;
+    $("freq").value = exp.freq;
+    $("category").value = exp.category || "";
+    $("formTitle").textContent = "Edit expense";
+    $("submitBtn").textContent = "Update";
+    $("cancelEdit").style.display = "";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  function stopEditing() {
+    editingId = null;
+    $("formTitle").textContent = "Add an expense";
+    $("submitBtn").textContent = "Add";
+    $("cancelEdit").style.display = "none";
+    $("expenseForm").reset();
+    $("freq").value = "fortnightly";
+  }
+
+  $("expenseBody").addEventListener("click", e => {
+    const editId = e.target.getAttribute && e.target.getAttribute("data-edit");
+    const delId = e.target.getAttribute && e.target.getAttribute("data-del");
+    if (editId) startEdit(parseInt(editId, 10));
+    if (delId) {
+      const id = parseInt(delId, 10);
+      const exp = state.expenses.find(x => x.id === id);
+      if (exp && confirm('Delete "' + exp.desc + '"?')) {
+        state.expenses = state.expenses.filter(x => x.id !== id);
+        if (editingId === id) stopEditing();
+        save(); renderAll();
+      }
+    }
+  });
+
+  ["search", "sortBy"].forEach(id =>
+    $(id).addEventListener("input", renderTable));
+  $("catFilter").addEventListener("change", renderTable);
+
+  // ==================== export / import / clear ====================
+  function download(filename, text, mime) {
+    const blob = new Blob([text], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+
+  $("btnExportCsv").addEventListener("click", () => {
+    const rows = [["Description", "Category", "Amount", "Frequency", "Per Fortnight", "Per Year"]];
+    state.expenses.forEach(e => rows.push([
+      e.desc, e.category || "", e.amount, FREQ[e.freq].label,
+      (annualCost(e) / FORTNIGHTS_PER_YEAR).toFixed(2), annualCost(e).toFixed(2)
+    ]));
+    rows.push([]);
+    rows.push(["TOTALS", "", "", "", "", totalAnnualExpenses().toFixed(2)]);
+    rows.push(["Annual income", "", "", "", "", annualIncome().toFixed(2)]);
+    rows.push(["Annual surplus", "", "", "", "", (annualIncome() - totalAnnualExpenses()).toFixed(2)]);
+    const csv = rows.map(r => r.map(c => {
+      const s = String(c == null ? "" : c);
+      return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    }).join(",")).join("\n");
+    download("spending-dashboard.csv", csv, "text/csv;charset=utf-8");
+  });
+
+  $("btnExportJson").addEventListener("click", () => {
+    download("spending-dashboard.json", JSON.stringify(state, null, 2), "application/json");
+  });
+
+  $("btnImport").addEventListener("click", () => $("fileImport").click());
+  $("fileImport").addEventListener("change", e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result);
+        if (!parsed || !Array.isArray(parsed.expenses)) throw new Error("bad format");
+        state = parsed;
+        if (!state.updatedAt) state.updatedAt = 0;
+        renumber();
+        save(); renderAll();
+        alert("Imported " + state.expenses.length + " expenses.");
+      } catch (err) {
+        alert("Could not import: not a valid dashboard JSON file.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  });
+
+  $("btnClear").addEventListener("click", () => {
+    if (confirm("Delete all income and expense data? This also syncs the empty state to the cloud if connected. Export first if you want a backup.")) {
+      state = { earnings: null, incomeFreq: "fortnightly", expenses: [], updatedAt: 0 };
+      nextId = 1;
+      stopEditing();
+      save(); renderAll();
+    }
+  });
+
+  // ==================== init ====================
+  load();
+  renderAll();
+  initLinkedFile();
+  initCloud();
+})();
+</script>
+</body>
+</html>
