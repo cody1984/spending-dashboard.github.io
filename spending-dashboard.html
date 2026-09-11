@@ -101,6 +101,7 @@
     font-family: inherit;
   }
   button:hover { filter: brightness(0.93); }
+  button:disabled { opacity: 0.6; cursor: default; }
   button.ghost { background: #fff; color: var(--ink); border: 1px solid var(--border); }
   button.danger { background: #fff; color: var(--bad); border: 1px solid var(--border); padding: 6px 12px; font-size: 0.8rem; }
   button.link { background: none; color: var(--accent); padding: 6px 10px; font-size: 0.85rem; }
@@ -607,6 +608,19 @@
 
   function cloudConnected() { return !!(gistId && gistToken); }
 
+  function friendlyGhError(e) {
+    if (e && e.status) {
+      if (e.status === 401) return "token rejected (401) — check it's a classic token with the gist scope, and hasn't expired or been revoked";
+      if (e.status === 403) return "GitHub refused the request (403) — token missing the gist scope, or rate-limited";
+      if (e.status === 404) return "Gist not found (404) — check the Gist ID";
+      return "GitHub error " + e.status;
+    }
+    if (/Failed to fetch|NetworkError|Load failed/i.test(e && e.message)) {
+      return "couldn't reach api.github.com — check your internet connection (or a network/firewall blocking GitHub)";
+    }
+    return (e && e.message) || "unknown error";
+  }
+
   function ghFetch(path, opts) {
     opts = opts || {};
     return fetch("https://api.github.com" + path, {
@@ -632,6 +646,23 @@
     const el = document.getElementById("cloudStatus");
     const btnSync = document.getElementById("btnCloudSync");
     const btnDisc = document.getElementById("btnCloudDisconnect");
+
+    // Errors must always be shown, connected or not — otherwise failures look
+    // like a dead button.
+    if (kind === "error") {
+      el.innerHTML = '<span style="color:var(--bad);font-weight:600">Sync problem:</span> ' +
+        escapeHtml(detail) +
+        '. Your data is still saved locally — fix the issue above, then try again.';
+      btnSync.style.display = cloudConnected() ? "" : "none";
+      btnDisc.style.display = cloudConnected() ? "" : "none";
+      return;
+    }
+    if (kind === "busy") {
+      el.textContent = "Connecting to GitHub…";
+      btnSync.style.display = "none";
+      btnDisc.style.display = "none";
+      return;
+    }
     if (!cloudConnected()) {
       el.textContent = "Not connected — data stays on this device only.";
       btnSync.style.display = "none";
@@ -645,9 +676,6 @@
         (lastPushOk ? "Last pushed " + new Date(lastPushOk).toLocaleTimeString() + ". " : "") +
         (lastPullOk ? "Last checked " + new Date(lastPullOk).toLocaleTimeString() + ". " : "") +
         "Pulls on open, pushes after every change.";
-    } else if (kind === "error") {
-      el.innerHTML = '<span style="color:var(--bad)">Sync problem: ' + escapeHtml(detail || "unknown error") +
-        '. Your data is still saved locally — check the token and Gist ID, then Sync now.</span>';
     }
   }
 
@@ -668,7 +696,7 @@
       lastPushOk = Date.now();
       renderCloudStatus("ok");
     } catch (e) {
-      renderCloudStatus("error", e.message);
+      renderCloudStatus("error", friendlyGhError(e));
     }
   }
 
@@ -695,19 +723,25 @@
       }
       renderCloudStatus("ok");
     } catch (e) {
-      renderCloudStatus("error", e.message);
+      renderCloudStatus("error", friendlyGhError(e));
     }
   }
 
   document.getElementById("btnCloudConnect").addEventListener("click", async () => {
+    const btn = document.getElementById("btnCloudConnect");
     const token = document.getElementById("gistTokenInput").value.trim();
     let id = document.getElementById("gistIdInput").value.trim();
     if (id) id = id.split("/").pop(); // accept full gist URLs too
-    if (!token) { renderCloudStatus("error", "paste a token first"); return; }
-    if (token.startsWith("github_pat_")) {
-      renderCloudStatus("error", "fine-grained tokens don't support Gists — create a classic token with only the gist scope");
+    if (!token) {
+      renderCloudStatus("error", "paste a token first — create one via the link above");
       return;
     }
+    if (token.startsWith("github_pat_")) {
+      renderCloudStatus("error", "fine-grained tokens don't support Gists — create a classic token with only the gist scope (use the link above)");
+      return;
+    }
+    btn.disabled = true;
+    renderCloudStatus("busy");
     gistToken = token;
     try {
       if (id) {
@@ -733,7 +767,9 @@
     } catch (e) {
       gistId = null;
       gistToken = null;
-      renderCloudStatus("error", e.status === 401 ? "token rejected (check it has the gist scope)" : e.message);
+      renderCloudStatus("error", friendlyGhError(e));
+    } finally {
+      btn.disabled = false;
     }
   });
 
